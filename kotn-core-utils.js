@@ -414,6 +414,124 @@
     createPanel
   };
 
+  // --- Collapsible wrapper for panels (mini-pill + persistence) ---
+function makeCollapsible({ id, title = 'Panel', panel, header, miniLabel = title }) {
+  if (!panel || !header) throw new Error('makeCollapsible requires panel and header from createPanel');
+
+  const store = createStore({ name: `panel:${id}`, scope: 'local' });
+
+  // Collapse button in header
+  const btn = dom.create('button', {
+    type: 'button',
+    textContent: '▣',
+    title: 'Collapse',
+    style: {
+      marginLeft: '8px',
+      border: '1px solid #333',
+      background: '#1d1d1d',
+      color: '#f5f5f5',
+      borderRadius: '6px',
+      padding: '2px 6px',
+      cursor: 'pointer'
+    }
+  });
+  header.appendChild(btn);
+
+  // Mini pill
+  const mini = dom.create('div', {
+    className: 'kotn-mini-pill',
+    style: {
+      position: 'fixed',
+      right: '16px',
+      top: '16px',
+      zIndex: '999999',
+      background: '#111',
+      color: '#fff',
+      border: '1px solid #2f2f2f',
+      borderRadius: '10px',
+      padding: '6px 8px',
+      fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+      fontSize: '12px',
+      display: 'none',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      boxShadow: '0 6px 18px rgba(0,0,0,.35)'
+    }
+  }, [ dom.create('span', { textContent: miniLabel }) ]);
+  document.body.appendChild(mini);
+
+  // Restore mini position and collapsed state
+  (function restore() {
+    const pos = store.get('miniPos');
+    if (pos && Number.isFinite(pos.left) && Number.isFinite(pos.top)) {
+      mini.style.left = pos.left + 'px';
+      mini.style.top  = pos.top  + 'px';
+      mini.style.right = 'auto';
+    }
+    if (store.get('collapsed', false)) {
+      panel.style.display = 'none';
+      mini.style.display = 'inline-flex';
+    }
+  })();
+
+  function setCollapsed(on) {
+    panel.style.display = on ? 'none' : '';
+    mini.style.display = on ? 'inline-flex' : 'none';
+    store.set('collapsed', !!on);
+  }
+
+  // Drag the mini pill
+  (function makeMiniDraggable() {
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+    function onDown(e) {
+      if (e.type === 'mousedown' && e.button !== 0) return;
+      const pt = e.touches ? e.touches[0] : e;
+      const r = mini.getBoundingClientRect();
+      dragging = true; sx = pt.clientX; sy = pt.clientY; ox = r.left; oy = r.top;
+      mini.style.right = 'auto';
+      e.preventDefault();
+    }
+    function onMove(e) {
+      if (!dragging) return;
+      const pt = e.touches ? e.touches[0] : e;
+      const dx = pt.clientX - sx, dy = pt.clientY - sy;
+      const left = clamp(ox + dx, 8, window.innerWidth  - mini.offsetWidth  - 8);
+      const top  = clamp(oy + dy, 8, window.innerHeight - mini.offsetHeight - 8);
+      mini.style.left = left + 'px';
+      mini.style.top  = top  + 'px';
+    }
+    function onUp() {
+      if (!dragging) return;
+      dragging = false;
+      try {
+        const r = mini.getBoundingClientRect();
+        store.set('miniPos', { left: Math.round(r.left), top: Math.round(r.top) });
+      } catch {}
+    }
+    mini.addEventListener('mousedown', onDown);
+    mini.addEventListener('touchstart', onDown, { passive: false });
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchend', onUp);
+  })();
+
+  // Click actions
+  btn.addEventListener('click', () => setCollapsed(true));
+  mini.addEventListener('click', () => setCollapsed(false));
+
+  return {
+    collapse() { setCollapsed(true); },
+    expand()   { setCollapsed(false); },
+    isCollapsed() { return !!store.get('collapsed', false); },
+    mini
+  };
+}
+
+KOTN.ui.makeCollapsible = makeCollapsible;
+
   // ---------------------------------------------------------------------------
   // CSV + download helpers
   // ---------------------------------------------------------------------------
@@ -715,4 +833,5 @@
   }
 
   KOTN.log = log;
+
 })();
