@@ -350,6 +350,11 @@
 
     function onPointerDown(ev) {
       if (ev.button !== 0) return;
+      // If the click is on an interactive control, do not initiate drag
+      const tag = (ev.target && ev.target.tagName || '').toUpperCase();
+      if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+        return;
+      }
       dragStart = {
         x: ev.clientX,
         y: ev.clientY,
@@ -835,3 +840,4 @@ KOTN.ui.makeCollapsible = makeCollapsible;
   KOTN.log = log;
 
 })();
+
